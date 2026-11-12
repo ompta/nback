@@ -16,14 +16,20 @@
   #loaderr { order: 2; font-size: 15px; color: #ff8b8b; padding: 12px; }
   #hdr h1 { font-size: 24px; letter-spacing: 4px; margin: 8px 0 2px; color: #7ee6d0; }
   #hdr div { font-size: 13px; opacity: .75; }
-  canvas { display: block; width: min(96vw, 147.2vh) !important; height: auto !important;
+  canvas { display: block; width: min(96vw, 53.1vh) !important; height: auto !important;
     max-width: 96vw; max-height: 92vh; touch-action: none; -webkit-tap-highlight-color: transparent;
     box-shadow: 0 18px 44px rgba(0,0,0,.6); }
+  /* The stage is phone-shaped (portrait), so it fills a phone screen as-is. */
   @media (orientation: portrait) and (max-width: 760px) {
     #hdr h1 { font-size: 19px; letter-spacing: 2px; margin: 4px 0 0; }
     #hdr div { font-size: 11px; }
     #foot { font-size: 11px; margin-top: 6px; }
-    #foot::after { content: ' · rotate to landscape for a bigger stage'; }
+  }
+  @media (orientation: landscape) and (max-height: 760px) {
+    #hdr h1 { font-size: 19px; letter-spacing: 2px; margin: 4px 0 0; }
+    #hdr div { font-size: 11px; }
+    #foot { font-size: 11px; margin-top: 6px; }
+    #foot::after { content: ' · rotate to portrait: the stage is phone-shaped'; }
   }
 </style>
 
@@ -203,7 +209,7 @@
   /* ============================================================
      2. GAME CONSTANTS + PURE LOGIC
      ============================================================ */
-  var GW = 960, GH = 600;
+  var GW = 600, GH = 1040;   /* portrait phone stage (the game targets phones) */
   /* Touch screen? Phones and tablets have no keyboard, so every key-only action
      gets a tap target and the setup pickers grow to thumb size. Decided once. */
   var TOUCH = !!((typeof navigator === 'object' && (navigator.maxTouchPoints || 0) > 0) ||
@@ -616,33 +622,38 @@
      3. PHASER SCENE — rendering + input glue
      ============================================================ */
   var FONT = '"Segoe UI", "Trebuchet MS", Arial, sans-serif';
-  var CELL = 84, GAP = 14;
-  var GRID_W = COLS * CELL + (COLS - 1) * GAP;  /* 280 */
-  var GRID_H = ROWS * CELL + (ROWS - 1) * GAP;  /* 280 */
-  var GX = (GW - GRID_W) / 2, GY = 196;         /* grid: 340..620 x 196..476 */
-  var CX = GW / 2, CY = GY + GRID_H / 2;        /* 480, 336 */
+  /* Phone-only stage: ONE layout for every device. The 3x3 grid is a square
+     block of thumb-sized cells that spans the stage width, the two MATCH
+     buttons are full-width strips directly below it, and the action bar runs
+     along the bottom. A desktop browser simply sees the same portrait stage
+     scaled to fit, and the keyboard shortcuts still work. */
+  var CELL = 184, GAP = 14;
+  var GRID_W = COLS * CELL + (COLS - 1) * GAP;   /* 580 */
+  var GRID_H = ROWS * CELL + (ROWS - 1) * GAP;   /* 580 - square grid, square cells */
+  var GX = (GW - GRID_W) / 2, GY = 292;
+  var CX = GW / 2, CY = GY + GRID_H / 2;
+  /* MATCH LETTER / MATCH POSITION: two full-width strips under the grid. */
   var BTN = {
-    letter: { x: 56, y: 238, w: 210, h: 108 },
-    pos:    { x: 694, y: 238, w: 210, h: 108 }
+    letter: { x: 10,  y: 884, w: 285, h: 72 },
+    pos:    { x: 305, y: 884, w: 285, h: 72 }
   };
   /* The letter panel sits ABOVE the grid so it can never hide the centre cell. */
-  var LBOX = { x: 400, y: 92, w: 160, h: 96 };
-  var LTX = LBOX.x + LBOX.w / 2, LTY = LBOX.y + 32;
-  var HTX = LBOX.x + LBOX.w / 2, HTY = LBOX.y + LBOX.h - 16;
-  var PANEL = { x: 60, y: 100, w: 840, h: 400 };
-  var START_BTN = { x: GW / 2 - 120, y: 436, w: 240, h: 52 };
-  /* Tap-to-setup chip on the results / game-over screens (touch only): a phone
-     has no Esc or R key, so leaving a round needs a target to tap. */
-  var EXIT_BTN = { x: 700, y: 436, w: 160, h: 52 };
+  var LBOX = { x: 180, y: 156, w: 240, h: 120 };
+  var LTX = LBOX.x + LBOX.w / 2, LTY = LBOX.y + 46;
+  var HTX = LBOX.x + LBOX.w / 2, HTY = LBOX.y + LBOX.h - 24;
+  /* Menu panel (setup / results / game over) + its buttons. */
+  var PANEL = { x: 24, y: 150, w: 552, h: 740 };
+  var START_BTN = { x: GW / 2 - 120, y: 760, w: 240, h: 56 };
+  /* Tap-to-setup chip on the results / game-over screens: a phone has no Esc
+     or R key, so leaving a round needs a target to tap. */
+  var EXIT_BTN = { x: 436, y: 760, w: 136, h: 56 };
 
   /* Setup-screen option buttons: pick N directly (1-4) and pick the channel
-     (letters only / positions only / both). Built once, drawn + hit-tested.
-     On touch the buttons are thumb-sized and sit higher, leaving room for the
-     shorter mobile rules block above them. */
-  var N_BTN_TPL = TOUCH ? { x: 76,  y: 362, w: 88,  h: 64, gap: 12 }
-                        : { x: 120, y: 372, w: 64,  h: 44, gap: 10 };
-  var CH_BTN_TPL = TOUCH ? { x: 470, y: 362, w: 132, h: 64, gap: 12 }
-                         : { x: 446, y: 372, w: 132, h: 44, gap: 12 };
+     (letters only / positions only / both). Thumb-sized and stacked in two
+     rows, because the phone stage is only 600px wide. Built once, drawn
+     + hit-tested. */
+  var N_BTN_TPL = { x: 106, y: 560, w: 88, h: 64, gap: 12 };
+  var CH_BTN_TPL = { x: 84, y: 678, w: 132, h: 64, gap: 12 };
   var N_BTNS = [], CH_BTNS = [];
   (function buildOptionRects() {
     for (var i = 0; i < N_MAX - N_MIN + 1; i++) {
@@ -656,14 +667,15 @@
   })();
   var CAP_N_X = (N_BTNS[0].x + N_BTNS[N_BTNS.length - 1].x + N_BTNS[N_BTNS.length - 1].w) / 2;
   var CAP_CH_X = (CH_BTNS[0].x + CH_BTNS[CH_BTNS.length - 1].x + CH_BTNS[CH_BTNS.length - 1].w) / 2;
-  var CAP_Y = N_BTN_TPL.y - (TOUCH ? 20 : 12);
+  var CAP_N_Y = N_BTN_TPL.y - 22;
+  var CAP_CH_Y = CH_BTN_TPL.y - 22;
 
-  /* Touch-only action bar for the play state: pause / hints / sound / speed /
-     length, i.e. every setting that would otherwise need a keyboard. */
-  var TBAR_TPL = { x: 176, y: 558, w: 116, h: 38, gap: 16 };
+  /* Action bar for the play state: pause / hints / sound / speed / length, i.e.
+     every setting that would otherwise need a keyboard. Always present, so the
+     game is fully playable with only a tap. */
+  var TBAR_TPL = { x: 11, y: 968, w: 106, h: 60, gap: 12 };
   var TBAR = [], TBAR_LABELS = ['PAUSE', 'HINTS', 'SOUND', 'SPEED', 'LEN'];
   (function buildBarRects() {
-    if (!TOUCH) return;
     for (var b = 0; b < TBAR_LABELS.length; b++) {
       TBAR.push({ x: TBAR_TPL.x + b * (TBAR_TPL.w + TBAR_TPL.gap), y: TBAR_TPL.y,
                   w: TBAR_TPL.w, h: TBAR_TPL.h });
@@ -687,20 +699,23 @@
       this.hudG = this.add.graphics();
       this.paintBackground();
 
-      /* Phones shrink the 960x600 stage to roughly 40%, so every st() font gets
+      /* Phones shrink the 600x1040 stage to roughly 60%, so every st() font gets
          a bump on touch screens to stay readable. */
-      var TXTK = TOUCH ? 1.3 : 1;
+      var TXTK = TOUCH ? 1.4 : 1;
       var st = function (size, color, align) {
         return { fontSize: Math.round(size * TXTK), fontFamily: FONT, color: color, align: align || 'center' };
       };
 
-      /* HUD texts (persistent, mutated every frame) */
-      this.tN = this.add.text(24, 30, '', st(30, '#ffffff')).setOrigin(0, 0.5);
-      this.tMode = this.add.text(CX, 30, '', st(20, '#7ee6d0')).setOrigin(0.5, 0.5);
-      this.tScore = this.add.text(GW - 24, 30, '', st(26, '#ffd98a')).setOrigin(1, 0.5);
-      this.tSub = this.add.text(CX, 66, '', st(14, '#9fb2d4')).setOrigin(0.5, 0.5);
-      this.tBest = this.add.text(GW - 24, 66, '', st(14, '#9fb2d4')).setOrigin(1, 0.5);
-      this.tStat = this.add.text(150, GH - 56, '', st(14, '#9fb2d4')).setOrigin(0, 0.5);
+      /* HUD texts, laid out in three rows inside the top band (0..140):
+         row 1  N (left) · channel (centre) · SCORE (right)
+         row 2  hearts (left, drawn) · speed + length (centre) · BEST (right)
+         row 3  the stats line (centre, full width) */
+      this.tN = this.add.text(16, 42, '', st(30, '#ffffff')).setOrigin(0, 0.5);
+      this.tMode = this.add.text(CX, 42, '', st(20, '#7ee6d0')).setOrigin(0.5, 0.5);
+      this.tScore = this.add.text(GW - 16, 42, '', st(20, '#ffd98a')).setOrigin(1, 0.5);
+      this.tSub = this.add.text(CX, 78, '', st(15, '#9fb2d4')).setOrigin(0.5, 0.5);
+      this.tBest = this.add.text(GW - 16, 78, '', st(15, '#9fb2d4')).setOrigin(1, 0.5);
+      this.tStat = this.add.text(CX, 112, '', st(15, '#9fb2d4')).setOrigin(0.5, 0.5);
 
       /* Button labels (created once, toggled per frame) */
       this.btnLabel = {
@@ -708,13 +723,14 @@
         pos: this.add.text(BTN.pos.x + BTN.pos.w / 2, BTN.pos.y + BTN.pos.h / 2, '', st(18, '#ffffff')).setOrigin(0.5, 0.5)
       };
       this.btnLabel.letter.alpha = 0; this.btnLabel.pos.alpha = 0;
-      this.tLegend = this.add.text(CX, GH - 22, '', st(13, '#7488ab')).setOrigin(0.5, 0.5);
+      /* The legend only shows on the setup screen, under the START button. */
+      this.tLegend = this.add.text(CX, 850, '', st(14, '#7488ab')).setOrigin(0.5, 0.5);
 
       /* Screen texts */
-      this.tBig = this.add.text(CX, 140, '', st(40, '#ffffff')).setOrigin(0.5, 0.5);
-      this.tBody = this.add.text(CX, 300, '', {
-        fontSize: TOUCH ? 19 : 15, fontFamily: FONT, color: '#c6d5f0', align: 'center',
-        lineSpacing: TOUCH ? 8 : 6, wordWrap: { width: TOUCH ? 700 : 760 }
+      this.tBig = this.add.text(CX, 190, '', st(40, '#ffffff')).setOrigin(0.5, 0.5);
+      this.tBody = this.add.text(CX, 360, '', {
+        fontSize: TOUCH ? 16 : 15, fontFamily: FONT, color: '#c6d5f0', align: 'center',
+        lineSpacing: 6, wordWrap: { width: 520 }
       }).setOrigin(0.5, 0.5);
       this.tCd = this.add.text(CX, CY, '', st(120, '#7ee6d0')).setOrigin(0.5, 0.5);
       this.tLetter = this.add.text(LTX, LTY, '', st(52, '#ffd98a')).setOrigin(0.5, 0.5);
@@ -732,8 +748,8 @@
         var cb = CH_BTNS[j];
         this.chLabels.push(this.add.text(cb.x + cb.w / 2, cb.y + cb.h / 2, '', st(18, '#ffffff')).setOrigin(0.5, 0.5));
       }
-      this.tCapN = this.add.text(CAP_N_X, CAP_Y, '', st(13, '#7488ab')).setOrigin(0.5, 0.5);
-      this.tCapCh = this.add.text(CAP_CH_X, CAP_Y, '', st(13, '#7488ab')).setOrigin(0.5, 0.5);
+      this.tCapN = this.add.text(CAP_N_X, CAP_N_Y, '', st(14, '#7488ab')).setOrigin(0.5, 0.5);
+      this.tCapCh = this.add.text(CAP_CH_X, CAP_CH_Y, '', st(14, '#7488ab')).setOrigin(0.5, 0.5);
       for (var k = 0; k < this.nLabels.length; k++) this.nLabels[k].alpha = 0;
       for (var m = 0; m < this.chLabels.length; m++) this.chLabels[m].alpha = 0;
       this.tCapN.alpha = 0; this.tCapCh.alpha = 0;
@@ -747,7 +763,7 @@
         this.barLabels[tb].alpha = 0;
       }
       this.tExit = this.add.text(EXIT_BTN.x + EXIT_BTN.w / 2, EXIT_BTN.y + EXIT_BTN.h / 2,
-        TOUCH ? 'SETUP' : '', st(20, '#0a0f1e')).setOrigin(0.5, 0.5);
+        'SETUP', st(20, '#0a0f1e')).setOrigin(0.5, 0.5);
       this.tExit.alpha = 0;
 
       this.tBig.alpha = 0; this.tBody.alpha = 0; this.tCd.alpha = 0;
@@ -789,15 +805,16 @@
       g.fillRect(0, 0, GW, GH);
       for (var i = 0; i < 8; i++) {
         g.fillStyle(0x111a30, 0.45);
-        g.fillRect(0, 70 + i * 74, GW, 2);
+        g.fillRect(0, 120 + i * 112, GW, 2);
       }
+      /* HUD band on top, control band (match strips + action bar) on the bottom. */
       g.fillStyle(0x0d1526, 0.94);
-      g.fillRect(0, 0, GW, 92);
+      g.fillRect(0, 0, GW, 140);
       g.fillStyle(0x0d1526, 0.94);
-      g.fillRect(0, GH - 110, GW, 110);
+      g.fillRect(0, GH - 162, GW, 162);
       g.lineStyle(1, 0x24344f, 1);
-      g.lineBetween(0, 92, GW, 92);
-      g.lineBetween(0, GH - 110, GW, GH - 110);
+      g.lineBetween(0, 140, GW, 140);
+      g.lineBetween(0, GH - 162, GW, GH - 162);
     }
 
     /* ---------- per-frame driver ----------
@@ -865,19 +882,19 @@
           var x = GX + c * (CELL + GAP), y = GY + r * (CELL + GAP);
           if (idx === prev && G.hint) {
             g.fillStyle(0x1a2438, 0.95);
-            g.fillRoundedRect(x, y, CELL, CELL, 12);
+            g.fillRoundedRect(x, y, CELL, CELL, 18);
             g.lineStyle(2, 0xffc86a, 0.85);
-            g.strokeRoundedRect(x + 5, y + 5, CELL - 10, CELL - 10, 8);
+            g.strokeRoundedRect(x + 8, y + 8, CELL - 16, CELL - 16, 12);
           } else if (idx === active) {
             g.fillStyle(0x2ee6c6, 0.45 + 0.45 * pulse);
-            g.fillRoundedRect(x, y, CELL, CELL, 12);
+            g.fillRoundedRect(x, y, CELL, CELL, 18);
             g.lineStyle(3, 0xffffff, 0.9);
-            g.strokeRoundedRect(x, y, CELL, CELL, 12);
+            g.strokeRoundedRect(x, y, CELL, CELL, 18);
           } else {
             g.fillStyle(0x121a2c, 0.95);
-            g.fillRoundedRect(x, y, CELL, CELL, 12);
+            g.fillRoundedRect(x, y, CELL, CELL, 18);
             g.lineStyle(1.5, 0x273450, 1);
-            g.strokeRoundedRect(x, y, CELL, CELL, 12);
+            g.strokeRoundedRect(x, y, CELL, CELL, 18);
           }
         }
       }
@@ -916,8 +933,10 @@
         this.btnG.fillRoundedRect(b.x, b.y, b.w, b.h, 14);
         this.btnG.lineStyle(2, pressed ? 0xffffff : 0x3f5a86, 1);
         this.btnG.strokeRoundedRect(b.x, b.y, b.w, b.h, 14);
-        this.btnLabel[dim].setText((dim === 'letter' ? 'MATCH LETTER' : 'MATCH POSITION') +
-          (pressed ? '\npressed' : ''));
+        var base = (dim === 'letter' ? 'MATCH LETTER' : 'MATCH POSITION');
+        /* The strips are 72px tall, so the pressed state sits on its own line
+           under the label instead of squeezing beside it. */
+        this.btnLabel[dim].setText(base + (pressed ? '\npressed' : ''));
         this.btnLabel[dim].alpha = 1;
       }
     }
@@ -951,7 +970,7 @@
       p.fillStyle(0x2ee6c6, 0.92);
       p.fillRoundedRect(b.x, b.y, b.w, b.h, 12);
       this.tStart.alpha = 1;
-      if (TOUCH && (st === 'results' || st === 'gameover')) {
+      if (st === 'results' || st === 'gameover') {
         var e = EXIT_BTN;
         p.fillStyle(0x2f4a6a, 0.92);
         p.fillRoundedRect(e.x, e.y, e.w, e.h, 12);
@@ -995,8 +1014,8 @@
     drawHud(now) {
       var g = this.hudG;
       var R = G.round;
-      /* progress bar */
-      var bx = 240, bw = 480, by = GH - 92, bh = 12;
+      /* progress bar: a full-width strip at the very top of the HUD band */
+      var bx = 60, bw = 480, by = 8, bh = 8;
       g.fillStyle(0x1a2438, 1);
       g.fillRoundedRect(bx, by, bw, bh, 6);
       if (R && R.items.length && R.i >= 0) {
@@ -1004,9 +1023,9 @@
         g.fillStyle(0x2ee6c6, 0.9);
         g.fillRoundedRect(bx, by, Math.max(6, bw * frac), bh, 6);
       }
-      /* lives (hearts) */
+      /* lives (hearts) — left end of the second HUD row */
       for (var i = 0; i < 3; i++) {
-        var x = 40 + i * 34, y = GH - 56;
+        var x = 30 + i * 34, y = 78;
         if (i < G.lives) g.fillStyle(0xff5a72, 1); else g.fillStyle(0x243048, 1);
         g.fillCircle(x - 6, y - 3, 7);
         g.fillCircle(x + 6, y - 3, 7);
@@ -1034,21 +1053,29 @@
       var running = (R0 && (st === 'play' || st === 'countdown'));
       var nShown = running ? R0.n : G.n;
       this.tN.setText('N = ' + nShown);
-      this.tMode.setText(mode.label + ' N-BACK');
+      this.tMode.setText(mode.label);
       this.tScore.setText('SCORE ' + G.score);
       this.tBest.setText('BEST ' + G.best);
-      this.tSub.setText(mode.desc + ' · ' + SPEEDS[G.speed].name + ' · ' + LENGTHS[G.len] +
-        ' items · hints ' + (G.hint ? 'ON' : 'OFF') + ' · sound ' + (SOUND_ON ? 'ON' : 'OFF') +
+      /* Row 2 only has room for a short centre label, so it carries the round
+         pace; hints + sound live in the stats line and on the action bar. */
+      this.tSub.setText(SPEEDS[G.speed].name + ' · ' + LENGTHS[G.len] + ' items' +
         (TOUCH ? '' : ' · auto-level ' + (G.autoLevel ? 'ON' : 'OFF')));
       var R = G.round;
       var judged = R ? (R.hit + R.miss + R.fa + R.cr) : 0;
       var acc = judged ? Math.round((R.hit + R.cr) / judged * 100) : 0;
-      this.tStat.setText('streak ' + G.streak + ' · accuracy ' + acc + '% · lives ' + G.lives);
-      this.tLegend.setText((st === 'play' || st === 'countdown')
-        ? (TOUCH ? 'TAP  the letter or the grid to answer · bar: pause, hints, sound, speed, length'
-                 : 'KEYS  SPACE/M match · A letter · D position · P pause · H hints · T sound · Esc setup')
-        : (TOUCH ? 'TAP  the N buttons and the channel buttons · tap START to begin'
-                 : 'KEYS  1-4 set N · L letters · P positions · B both · S speed · V length · H hints · T sound'));
+      this.tStat.setText('streak ' + G.streak + ' · acc ' + acc + '% · hints ' +
+        (G.hint ? 'ON' : 'OFF') + ' · sound ' + (SOUND_ON ? 'ON' : 'OFF'));
+      /* The legend only appears on the setup screen, under the START button,
+         so it can use the full stage width without colliding with the play
+         stack (grid -> match strips -> action bar). */
+      this.tLegend.setText(TOUCH
+        ? 'TAP the N + CHANNEL buttons, then tap START'
+        : 'KEYS  1-4 N · L/P/B channel · S speed · V length · H hints');
+      this.tLegend.alpha = (st === 'setup') ? 1 : 0;
+      /* On the play screen the letter panel + strips own the top and bottom of
+         the stage, so the only clear spot for the PAUSED banner is the middle
+         of the grid (which is frozen while the round is paused). */
+      this.tBig.y = (st === 'play') ? CY : 190;
 
       this.tStart.alpha = (st === 'setup' || st === 'results' || st === 'gameover') ? 1 : 0;
       /* The N + channel pickers belong to the setup screen only: once a round
@@ -1058,15 +1085,15 @@
         for (var oj = 0; oj < this.chLabels.length; oj++) this.chLabels[oj].alpha = 0;
         this.tCapN.alpha = 0; this.tCapCh.alpha = 0;
       }
-      /* Touch-only chips: the action bar lives in the play state, the tap-to-setup
-         chip on the results / game-over screens. */
-      if (!(TOUCH && st === 'play')) {
+      /* The action bar belongs to the play state; the tap-to-setup chip to the
+         results / game-over screens. */
+      if (st !== 'play') {
         for (var ob = 0; ob < this.barLabels.length; ob++) this.barLabels[ob].alpha = 0;
       }
-      this.tExit.alpha = (TOUCH && (st === 'results' || st === 'gameover')) ? 1 : 0;
-      /* The setup screen shows the option buttons under the rules, so the
-         rules block sits higher there than on the results / game-over screens. */
-      this.tBody.y = (st === 'setup') ? (TOUCH ? 236 : 256) : 300;
+      this.tExit.alpha = (st === 'results' || st === 'gameover') ? 1 : 0;
+      /* The setup screen packs the rules + two picker rows + START, so its
+         rules block sits higher than on the results / game-over screens. */
+      this.tBody.y = (st === 'setup') ? 370 : 440;
 
       if (st === 'setup') {
         this.tBig.setText('SETUP');
@@ -1144,23 +1171,30 @@
   /* ============================================================
      4. INPUT / STATE TRANSITIONS (framework independent)
      ============================================================ */
+  /* Rules are wrapped to the 520px text box on the 600px phone stage, so every
+     line is kept short enough to stay on one rendered line. */
   var RULES =
     'HOW TO PLAY\n' +
-    'Items are shown and spoken one at a time. Press MATCH when the current item equals\n' +
-    'the item N steps earlier; do not press when it differs. DUAL judges both channels.\n\n' +
-    'SCORING\n' +
-    'hit +100 (+streak)   correct rejection +10   miss -100   false alarm -50   3 lives\n\n' +
-    'SETUP  1-4 = N   L letters   P positions   B both   S speed   V length   H hints\n' +
-    'Click the N buttons and the channel buttons below, or press SPACE to start.';
+    'Items are shown and spoken one at a time. Press MATCH when\n' +
+    'the current item equals the item N steps earlier; do not\n' +
+    'press when it differs. DUAL judges both channels.\n\n' +
+    'SCORING  hit +100  reject +10  miss -100  false alarm -50\n\n' +
+    'SETUP  1-4 = N  L letters  P positions  B both  S speed\n' +
+    'V length  H hints  T sound  Esc setup\n\n' +
+    'Tap or click the N + channel buttons below,\n' +
+    'then press SPACE.';
 
-  /* Shorter wording for phones: fewer lines, tap verbs instead of key names,
-     so the block still clears the thumb-sized pickers below it. */
+  /* Shorter wording for phones: tap verbs instead of key names. */
   var RULES_TOUCH =
     'HOW TO PLAY\n' +
-    'Tap MATCH when the current item equals the item\n' +
-    'N steps earlier. Do not tap when it differs.\n' +
-    'SCORING  hit +100  reject +10  miss -100  false alarm -50\n' +
-    'Tap the N and CHANNEL buttons, then tap START.';
+    'Tap the MATCH strips, the letter panel,\n' +
+    'the grid or the letter when the current\n' +
+    'item equals the one N steps back.\n' +
+    'Do not tap when it differs.\n\n' +
+    'hit +100  reject +10  miss -100\n' +
+    'false alarm -50  3 lives\n' +
+    'Tap the N + CHANNEL buttons, then\n' +
+    'tap START.';
 
   function inRect(x, y, r) {
     return x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
@@ -1181,7 +1215,7 @@
         return;
       }
       /* Tap back to the setup screen from a finished round (no Esc/R on phones). */
-      if (TOUCH && (st === 'results' || st === 'gameover') && inRectPad(x, y, EXIT_BTN)) {
+      if ((st === 'results' || st === 'gameover') && inRectPad(x, y, EXIT_BTN)) {
         if (st === 'gameover') resetAll();
         G.state = 'setup';
         sfxBlip();
@@ -1200,18 +1234,16 @@
       return;
     }
     if (st !== 'play') return;
-    /* Touch action bar first: PAUSE has to work while the round is paused. */
-    if (TOUCH) {
-      for (var b = 0; b < TBAR.length; b++) {
-        if (!inRectPad(x, y, TBAR[b])) continue;
-        if (b === 0) togglePause();
-        else if (b === 1) G.hint = !G.hint;
-        else if (b === 2) SOUND_ON = !SOUND_ON;
-        else if (b === 3) setSpeed((G.speed + 1) % SPEEDS.length);
-        else G.len = (G.len + 1) % LENGTHS.length;
-        sfxBlip();
-        return;
-      }
+    /* Action bar first: PAUSE has to work while the round is paused. */
+    for (var b = 0; b < TBAR.length; b++) {
+      if (!inRectPad(x, y, TBAR[b])) continue;
+      if (b === 0) togglePause();
+      else if (b === 1) G.hint = !G.hint;
+      else if (b === 2) SOUND_ON = !SOUND_ON;
+      else if (b === 3) setSpeed((G.speed + 1) % SPEEDS.length);
+      else G.len = (G.len + 1) % LENGTHS.length;
+      sfxBlip();
+      return;
     }
     if (G.paused) return;
     if (inRectPad(x, y, BTN.letter)) { pressDim('letter'); return; }
@@ -1316,6 +1348,9 @@
     channelOf: dimsToMode,
     modes: MODES,
     stage: { w: GW, h: GH },
+    grid: { x: GX, y: GY, w: GRID_W, h: GRID_H, cw: CELL, ch: CELL },
+    matchBtns: BTN,
+    letterBox: LBOX,
     optionRects: { n: N_BTNS, ch: CH_BTNS, start: START_BTN, panel: PANEL },
     touch: TOUCH,
     touchRects: { bar: TBAR, exit: EXIT_BTN },
